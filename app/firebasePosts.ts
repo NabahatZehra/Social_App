@@ -4,6 +4,7 @@ import {
     arrayUnion,
     collection,
     doc,
+    getDoc,
     getDocs,
     orderBy,
     query,
@@ -12,6 +13,7 @@ import {
     updateDoc
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { NotificationService } from './services/NotificationService';
 
 // Create a new post (text + optional imageUrl)
 export async function createPost({ userId, userName, text, imageUrl }: { userId: string; userName: string; text: string; imageUrl?: string }) {
@@ -33,9 +35,19 @@ export async function fetchPosts() {
 }
 
 // Like a post
-export async function likePost(postId: string, userId: string) {
+export async function likePost(postId: string, userId: string, userName: string) {
   const postRef = doc(db, 'posts', postId);
-  await updateDoc(postRef, { likes: arrayUnion(userId) });
+  const postSnap = await getDoc(postRef);
+  
+  if (postSnap.exists()) {
+    const postData = postSnap.data();
+    await updateDoc(postRef, { likes: arrayUnion(userId) });
+    
+    // Send notification to post author (if not liking own post)
+    if (postData.userId !== userId) {
+      await NotificationService.sendLikeNotification(userName, postData.text);
+    }
+  }
 }
 
 // Unlike a post
@@ -53,6 +65,18 @@ export async function addComment(postId: string, { userId, userName, text }: { u
     text,
     createdAt: serverTimestamp(),
   });
+  
+  // Get post data to send notification to post author
+  const postRef = doc(db, 'posts', postId);
+  const postSnap = await getDoc(postRef);
+  
+  if (postSnap.exists()) {
+    const postData = postSnap.data();
+    // Send notification to post author (if not commenting on own post)
+    if (postData.userId !== userId) {
+      await NotificationService.sendCommentNotification(userName, text, postData.text);
+    }
+  }
 }
 
 // Fetch comments for a post, ordered by createdAt asc

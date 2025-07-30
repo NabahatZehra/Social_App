@@ -5,10 +5,11 @@ import Home from './(tabs)/Home';
 import Profile from './(tabs)/Profile';
 import ProfileEdit from './(tabs)/ProfileEdit';
 import Settings from './(tabs)/Settings';
+import UserProfile from './(tabs)/UserProfile';
 import ForgotPassword from './auth/ForgotPassword';
 import Login from './auth/Login';
 import SignUp from './auth/SignUp';
-import { useAuth } from './context/AuthContext';
+import { useApp } from './context/AppContext';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -24,7 +25,7 @@ function MainTabs() {
 }
 
 export default function AppNavigation() {
-  const { user, loading } = useAuth();
+  const { user, loading } = useApp();
   if (loading) return null;
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -32,6 +33,7 @@ export default function AppNavigation() {
         <>
           <Stack.Screen name="Main" component={MainTabs} />
           <Stack.Screen name="ProfileEdit" component={ProfileEdit} />
+          <Stack.Screen name="UserProfile" component={UserProfile} />
         </>
       ) : (
         <>

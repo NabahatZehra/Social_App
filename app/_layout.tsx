@@ -1,11 +1,14 @@
 import React from 'react';
-import { AuthProvider } from './context/AuthContext';
+import ErrorBoundary from './components/ErrorBoundary';
+import { AppProvider } from './context/AppContext';
 import AppNavigation from './navigation';
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <AppNavigation />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <AppNavigation />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }

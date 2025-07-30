@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Button, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useAuth } from '../context/AuthContext';
-import { addComment, fetchComments } from '../firebasePosts';
+import { useApp } from '../context/AppContext';
+import { addComment } from '../firebasePosts';
 
 interface CommentsModalProps {
   visible: boolean;
@@ -10,22 +10,11 @@ interface CommentsModalProps {
 }
 
 export default function CommentsModal({ visible, onClose, postId }: CommentsModalProps) {
-  const { user } = useAuth();
-  const [comments, setComments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user, getCommentsForPost } = useApp();
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const loadComments = async () => {
-    setLoading(true);
-    const data = await fetchComments(postId);
-    setComments(data);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    if (visible) loadComments();
-  }, [visible]);
+  const comments = getCommentsForPost(postId);
 
   const handleAddComment = async () => {
     if (!text.trim() || !user) return;
@@ -37,7 +26,6 @@ export default function CommentsModal({ visible, onClose, postId }: CommentsModa
     });
     setText('');
     setSubmitting(false);
-    loadComments();
   };
 
   return (
@@ -46,22 +34,18 @@ export default function CommentsModal({ visible, onClose, postId }: CommentsModa
         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
           <Text style={styles.closeText}>Close</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Comments</Text>
-        {loading ? (
-          <Text>Loading...</Text>
-        ) : (
-          <FlatList
-            data={comments}
-            keyExtractor={item => item.id}
-            renderItem={({ item }) => (
-              <View style={styles.comment}>
-                <Text style={styles.author}>{item.userName}</Text>
-                <Text>{item.text}</Text>
-                <Text style={styles.timestamp}>{item.createdAt?.toDate ? item.createdAt.toDate().toLocaleString() : ''}</Text>
-              </View>
-            )}
-          />
-        )}
+        <Text style={styles.title}>Comments ({comments.length})</Text>
+        <FlatList
+          data={comments}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <View style={styles.comment}>
+              <Text style={styles.author}>{item.userName}</Text>
+              <Text>{item.text}</Text>
+              <Text style={styles.timestamp}>{item.createdAt?.toDate ? item.createdAt.toDate().toLocaleString() : ''}</Text>
+            </View>
+          )}
+        />
         <View style={styles.inputRow}>
           <TextInput
             style={styles.input}
