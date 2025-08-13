@@ -58,17 +58,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   title: {
-    fontSize: scale(24),
+    fontSize: scale(18),
     fontWeight: 'bold',
     marginBottom: hp(2),
     textAlign: 'center',
   },
   message: {
-    fontSize: scale(16),
+    fontSize: scale(12),
     textAlign: 'center',
     marginBottom: hp(3),
     color: '#666',
-    lineHeight: scale(24),
+    lineHeight: scale(18),
   },
   button: {
     backgroundColor: '#007AFF',
@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
-    fontSize: scale(16),
+    fontSize: scale(12),
     fontWeight: '600',
   },
 }); 

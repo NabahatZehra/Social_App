@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   text: {
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: '500',
   },
 }); 

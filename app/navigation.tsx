@@ -9,6 +9,7 @@ import UserProfile from './(tabs)/UserProfile';
 import ForgotPassword from './auth/ForgotPassword';
 import Login from './auth/Login';
 import SignUp from './auth/SignUp';
+import LoadingScreen from './components/LoadingScreen';
 import { useApp } from './context/AppContext';
 
 const Tab = createBottomTabNavigator();
@@ -26,7 +27,11 @@ function MainTabs() {
 
 export default function AppNavigation() {
   const { user, loading } = useApp();
-  if (loading) return null;
+  
+  if (loading) {
+    return <LoadingScreen message="Checking authentication..." />;
+  }
+  
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {user ? (

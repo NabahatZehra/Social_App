@@ -1,9 +1,10 @@
 import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
-import { arrayRemove, arrayUnion, collection, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { arrayRemove, arrayUnion, doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import app, { db } from '../firebase';
 import { useMemoizedCallback } from '../hooks/useMemoizedCallback';
 import { NotificationService } from '../services/NotificationService';
+import { RealTimeService } from '../services/RealTimeService';
 
 interface Post {
   id: string;
@@ -35,6 +36,8 @@ interface AppContextType {
   setUserOnlineStatus: (isOnline: boolean) => Promise<void>;
   getCommentsForPost: (postId: string) => Comment[];
   clearError: () => void;
+  signOut: () => Promise<void>;
+  forceClearAuth: () => void;
 }
 
 const AppContext = createContext<AppContextType>({
@@ -49,6 +52,8 @@ const AppContext = createContext<AppContextType>({
   setUserOnlineStatus: async () => {},
   getCommentsForPost: () => [],
   clearError: () => {},
+  signOut: async () => {},
+  forceClearAuth: () => {},
 });
 
 export const useApp = () => useContext(AppContext);
@@ -133,7 +138,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [user, setUserOnlineStatus]);
 
-  // Posts real-time listener
+  // Posts real-time listener using RealTimeService
   useEffect(() => {
     if (!user) {
       setPosts([]);
@@ -144,10 +149,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPostsLoading(true);
     setError(null);
     
-    const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const unsubscribe = RealTimeService.subscribeToPosts((postsData) => {
       try {
-        const postsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Post[];
         setPosts(postsData);
         setPostsLoading(false);
       } catch (error) {
@@ -155,26 +158,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setError('Failed to load posts');
         setPostsLoading(false);
       }
-    }, (error) => {
-      console.error('Posts listener error:', error);
-      setError('Failed to load posts');
-      setPostsLoading(false);
     });
 
     return unsubscribe;
   }, [user]);
 
-  // Real-time comments listener for all posts
+  // Real-time comments listener using RealTimeService
   useEffect(() => {
     if (!user || posts.length === 0) return;
 
     const unsubscribers: (() => void)[] = [];
 
     posts.forEach(post => {
-      const commentsQuery = query(collection(db, 'posts', post.id, 'comments'), orderBy('createdAt', 'asc'));
-      const unsubscribe = onSnapshot(commentsQuery, (querySnapshot) => {
+      const unsubscribe = RealTimeService.subscribeToPostComments(post.id, (commentsData) => {
         try {
-          const commentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Comment[];
           setComments(prev => ({
             ...prev,
             [post.id]: commentsData,
@@ -182,8 +179,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } catch (error) {
           console.error('Error processing comments:', error);
         }
-      }, (error) => {
-        console.error('Comments listener error:', error);
       });
       unsubscribers.push(unsubscribe);
     });
@@ -202,11 +197,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const postData = postSnap.data();
         await updateDoc(postRef, { likes: arrayUnion(userId) });
         
-        // Send notification to post author (if not liking own post)
-        if (postData.userId !== userId) {
-          const userName = user?.displayName || user?.email || 'User';
-          await NotificationService.sendLikeNotification(userName, postData.text);
-        }
+        // Handle real-time updates and notifications
+        await RealTimeService.handleLikeUpdate(
+          postId, 
+          userId, 
+          true, 
+          postData.userId, 
+          postData.userName, 
+          postData.text
+        );
       }
     } catch (error) {
       console.error('Error liking post:', error);
@@ -237,6 +236,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setError(null);
   }, []);
 
+  const signOut = useCallback(async () => {
+    try {
+      await setUserOnlineStatus(false);
+      const auth = getAuth(app);
+      await auth.signOut();
+      setUser(null);
+      setPosts([]);
+      setComments({});
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  }, [setUserOnlineStatus]);
+
+  const forceClearAuth = useCallback(() => {
+    setUser(null);
+    setPosts([]);
+    setComments({});
+    setLoading(false);
+  }, []);
+
   const contextValue = useMemo(() => ({
     user,
     loading,
@@ -249,6 +268,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUserOnlineStatus,
     getCommentsForPost,
     clearError,
+    signOut,
+    forceClearAuth,
   }), [
     user,
     loading,
@@ -261,6 +282,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUserOnlineStatus,
     getCommentsForPost,
     clearError,
+    signOut,
+    forceClearAuth,
   ]);
 
   return (

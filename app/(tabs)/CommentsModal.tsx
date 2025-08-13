@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Button, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Alert, Button, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useApp } from '../context/AppContext';
 import { addComment } from '../firebasePosts';
 
@@ -16,45 +16,66 @@ export default function CommentsModal({ visible, onClose, postId }: CommentsModa
 
   const comments = getCommentsForPost(postId);
 
-  const handleAddComment = async () => {
+  const handleAddComment = useCallback(async () => {
     if (!text.trim() || !user) return;
-    setSubmitting(true);
-    await addComment(postId, {
-      userId: user.uid,
-      userName: user.displayName || user.email || 'User',
-      text,
-    });
-    setText('');
-    setSubmitting(false);
-  };
+    
+    try {
+      setSubmitting(true);
+      await addComment(postId, {
+        userId: user.uid,
+        userName: user.displayName || user.email?.split('@')[0] || 'User',
+        text: text.trim(),
+      });
+      setText('');
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      Alert.alert('Error', 'Failed to add comment. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [text, user, postId]);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <Text style={styles.closeText}>Close</Text>
+          <Text style={styles.closeText}>❌ Close</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Comments ({comments.length})</Text>
         <FlatList
           data={comments}
           keyExtractor={item => item.id}
-          renderItem={({ item }) => (
+          renderItem={useCallback(({ item }: { item: any }) => (
             <View style={styles.comment}>
               <Text style={styles.author}>{item.userName}</Text>
-              <Text>{item.text}</Text>
+              <Text style={styles.commentText}>{item.text}</Text>
               <Text style={styles.timestamp}>{item.createdAt?.toDate ? item.createdAt.toDate().toLocaleString() : ''}</Text>
             </View>
-          )}
+          ), [])}
+          initialNumToRender={10}
+          maxToRenderPerBatch={5}
+          windowSize={10}
+          removeClippedSubviews={true}
         />
-        <View style={styles.inputRow}>
+        <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
             placeholder="Add a comment..."
+            placeholderTextColor="#888"
             value={text}
             onChangeText={setText}
-            editable={!submitting}
+            multiline
+            maxLength={200}
           />
-          <Button title={submitting ? 'Posting...' : 'Post'} onPress={handleAddComment} disabled={submitting || !text.trim() || !user} />
+          <TouchableOpacity 
+            style={[styles.submitButton, !text.trim() && styles.disabledButton]} 
+            onPress={handleAddComment}
+            disabled={submitting || !text.trim()}
+          >
+            <Text style={styles.submitButtonText}>
+              {submitting ? '💬 Adding...' : '✨ Add Comment'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -69,11 +90,20 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     alignSelf: 'flex-end',
-    marginBottom: 8,
+    padding: 12,
+    marginBottom: 16,
+    backgroundColor: '#e17055',
+    borderRadius: 20,
+    shadowColor: '#e17055',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   closeText: {
-    color: 'blue',
-    fontSize: 16,
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   title: {
     fontSize: 20,
@@ -81,14 +111,28 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   comment: {
-    marginBottom: 12,
-    padding: 8,
-    backgroundColor: '#f1f1f1',
-    borderRadius: 6,
+    padding: 16,
+    marginVertical: 4,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    borderLeftWidth: 3,
+    borderLeftColor: '#74b9ff',
   },
   author: {
-    fontWeight: 'bold',
-    marginBottom: 2,
+    fontWeight: '700',
+    marginBottom: 6,
+    color: '#2d3436',
+    fontSize: 14,
+  },
+  commentText: {
+    color: '#2d3436',
+    fontSize: 14,
+    lineHeight: 20,
   },
   timestamp: {
     fontSize: 10,
@@ -96,8 +140,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'right',
   },
-  inputRow: {
-    flexDirection: 'row',
+  inputContainer: {
+    flexDirection: 'column',
     alignItems: 'center',
     marginTop: 8,
   },
@@ -109,4 +153,24 @@ const styles = StyleSheet.create({
     padding: 8,
     marginRight: 8,
   },
-}); 
+  submitButton: {
+    backgroundColor: '#74b9ff',
+    padding: 12,
+    borderRadius: 5,
+    shadowColor: '#74b9ff',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  disabledButton: {
+    backgroundColor: '#ddd',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  submitButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});

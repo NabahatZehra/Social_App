@@ -15,7 +15,9 @@ export const hp = (percentage: number) => {
 };
 
 export const scale = (size: number) => {
-  return (screenWidth / baseWidth) * size;
+  // More conservative scaling to prevent oversized fonts
+  const scaleFactor = Math.min(screenWidth / baseWidth, 1.2);
+  return size * scaleFactor;
 };
 
 export const verticalScale = (size: number) => {
